@@ -1,0 +1,413 @@
+---
+title: "ECON457 R lab 2"
+subtitle: "Optimization in R"
+author: "Jon Duan | University of Victoria"
+date: "ECON403 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts] 
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+library(knitr)
+knitr::opts_chunk$set(
+  fig.align="center", fig.width=6, fig.height=4.5, 
+   out.width="748px", out.length="520.75px",
+  dpi=300, fig.path='Figs/',
+  cache=T, warning=F, message=F #, echo=F,
+  )
+```
+
+# Table of contents
+
+1. [Prologue](#prologue)
+
+2. [Optimization basics](#basics)
+
+3. [Linear programming](#linear)
+
+4. [Quadratic programming](#quadratic)
+
+5. [Summary](#summary)
+
+
+---
+class:  inverse, center, middle
+name: prologue
+
+# Prologue
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=796px></html>
+
+
+---
+
+## Bridge-in
+
+
+- Optimization problems are everywhere
+  - An investor decides how to put her/his money in different assets.
+  - A farmer decides how to use her/his land to grow 
+
+---
+# Intended Learning Outcome
+
+- Install packages in RStudio
+- Recognize the types of optimization problems
+- Convert linear programming and quadratic programming to standard forms  
+- Use ROI to solve linear programming and quadratic programming problem.
+ 
+
+
+---
+class: inverse, center, middle
+name: basics
+
+# Optimization basics
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=796px></html>
+
+
+---
+# Information about optimization in R
+
+http://cran.r-project.org/web/views/Optimization.html
+
+https://www.rdocumentation.org/packages/ROI/versions/0.2-1
+
+This file can be downloaded at https://github.com/ECON457-sp19/labs/raw/master/lab03/lab03.Rmd
+
+
+
+---
+# The R Optimization Infrastructure (ROI)
+
+The R Optimization Infrastructure ([ROI](https://cran.r-project.org/web/packages/ROI/ROI.pdf)) package promotes the development and use of open source optimization problem solvers for R.
+
+
+ROI handle LP up to MILP and MIQCP problems using the following supported solvers :
+
+1. lpSolve
+
+2. quadprog
+
+3. Rcplex
+
+4. Rglpk (default)
+
+5. Rsymphony
+
+more... 
+
+---
+#  Solvers
+
+[CPLEX](https://www.r-bloggers.com/using-cplex-in-r-installing-cplexapi-in-windows-10/) and [Gurobi](https://cran.r-project.org/web/packages/prioritizr/vignettes/gurobi_installation.html) are commercial solvers. Students can get academic license. 
+
+[GLPK](http://winglpk.sourceforge.net/) is free. 
+
+R has the high level interface [Rglpk](https://cran.r-project.org/web/packages/Rglpk/index.html).
+
+
+
+
+
+---
+# Pre-assessment
+
+- Linear programming
+- Quadratic programming
+- R packages 
+
+
+---
+# Install all the packages.
+
+Uncomment the code in follow chunk. I
+
+Install and load all packages.
+
+```{r}
+#install.packages("ROI")
+#install.packages(c( "Rglpk","ROI.plugin.symphony","ROI.plugin.glpk","ROI.plugin.quadprog","ROI.plugin.nloptr","ROI.plugin.ipop","ROI.plugin.ecos"))
+# suppressMessages(library(lpSolve))
+# suppressMessages(library(lpSolveAPI))
+# suppressMessages(library(quadprog))
+# suppressMessages(library(Rglpk))
+suppressMessages(library("ROI"))
+ROI_registered_solvers()
+```
+
+
+---
+class: inverse, center, middle
+name: linear
+
+# Linear Progarmming
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=796px></html>
+
+---
+# Standard form for linear programming
+
+Objective function:
+$$f(x) =  c^T x.$$ 
+Here, $x$ is a vector in $\mathbb{R}^n$, $c$ is a constant vector in $\mathbb{R}^n$.
+
+A system of linear constraints on the vector $x \in \mathbb{R}^n$.
+
+$$ Lx <= b $$ 
+
+One example:
+
+
+$$\begin{align*}     \text{maximize: }   2 x_1 &+ 4 x_2 + 3 x_3\\ \text{subject to: }     3 x_1 &+ 4 x_2 + 2 x_3 & <= 60 \\                        2 x_1 &+   x_2 +   x_3 & <= 40 \\                           x_1 &+ 3 x_2 + 2 x_3 & <= 80 
+\end{align*}$$
+
+
+
+---
+
+# Standard form to ROI package
+
+
+```{r}
+## Simple linear program.
+## three decision variables: x1, x2, x3
+## matrix form:    objective: c*x 
+##               constraints: L*x <= b  
+## maximize:   2 x_1 + 4 x_2 + 3 x_3
+## subject to: 3 x_1 + 4 x_2 + 2 x_3 <= 60
+##             2 x_1 +   x_2 +   x_3 <= 40
+##               x_1 + 3 x_2 + 2 x_3 <= 80
+##               x_1, x_2, x_3 are non-negative real numbers
+
+LP <- OP( c(2, 4, 3), # objective function, vector c 
+          L_constraint(L = matrix(c(3, 2, 1, 4, 1, 3, 2, 1, 2), nrow = 3), # linear constraint: Maxtrix A, r is organized by column not row. 
+                       dir = c("<=", "<=", "<="), # direction
+                       rhs = c(60, 40, 80)),      # right hand side: vector b 
+          max = TRUE )  # defaults is minimize: max = FALSE. change to max
+LP # model named as LP
+```
+
+
+
+
+
+---
+# Solve
+
+```{r}
+sol <- ROI_solve(LP)# , solver = "glpk")  # Solve model LP with specific solver glpk or automatically choose by ROI.
+sol
+```
+
+
+
+---
+# Solutions
+
+```{r}
+solution(sol, type = c("primal")) # solution for primal problem
+solution(sol, type = c("dual"))  # solution for dual problem: minimize total cost by subject to L'y >= c
+```
+
+---
+# Extract solutions
+```{r}
+sol$solution
+# sol$objval
+sol$status
+sol$message # detailed message for solution 
+```
+
+
+---
+# Hands on a small problem
+
+[Example:](https://www.analyticsvidhya.com/blog/2017/02/lintroductory-guide-on-linear-programming-explained-in-simple-english/) 
+
+- Consider a chocolate manufacturing company which produces only two types of chocolate – A and B. 
+
+- Both the chocolates require Milk and Choco only.  To manufacture each unit of A and B, following quantities are required:
+
+  - Each unit of A requires 1 unit of Milk and 3 units of Choco
+  - Each unit of B requires 1 unit of Milk and 2 units of Choco
+
+- The company kitchen has a total of 5 units of Milk and 12 units of Choco. 
+
+- On each sale, the company makes a profit of
+
+  - Rs 6 per unit A sold
+  - Rs 5 per unit B sold.
+
+
+---
+class: inverse, center, middle
+name: quadratic
+
+# Quadratic Programming
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=796px></html>
+
+---
+# Quadratic Programming
+
+we can write the quadratic program (QP) compactly as: 
+
+$$\left\{ \begin{array}{l} \mathrm{minimize}_{x \in \mathbb{R}^n}: \qquad F(x) = \frac{1}{2} x^T Q x - L_1^T x  \\ \mathrm{subject\; to:} \qquad L_2x <= b \end{array} \right.$$
+
+Here, $x$ is a vector in $\mathbb{R}^n$, $Q$ is an $n \times n$ symmetric positive definite matrix, $L_1$ is a constant vector in $\mathbb{R}^n$. The function $Q(x)$ is sometimes referred to as a quadratic form and it generalizes the quadratic function $q(x) = ax^2 +bx + c$ to higher dimensions. 
+
+
+
+
+---
+# Standard form for quadratic programming problem
+
+It will require putting problem in matrix form.
+
+# Example #1:
+Consider the objective function: 
+
+$$\begin{eqnarray*} F(x,y) &=& \frac{1}{2} \left[ \begin{matrix} x & y \end{matrix} \right] \left[ \begin{matrix} 2 & -1 \\ -1 & 2 \end{matrix} \right] \left[ \begin{matrix} x \\ y \end{matrix} \right] - \left[ \begin{matrix} -3 & 2 \end{matrix} \right] \left[ \begin{matrix} x \\ y \end{matrix} \right] + 4 \\ &=& x^2 + y^2 -xy +3x -2y + 4 . \end{eqnarray*}$$ 
+
+
+
+We set:
+$$Q =  \left[ \begin{matrix} 2 & -1 \\ -1 & 2 \end{matrix} \right] \qquad  L_1 = \left[ \begin{matrix} -3 \\ 2 \end{matrix} \right].$$
+
+
+
+
+
+---
+# Standard form for Quadratic Progarmming
+
+three decision variables: x1, x2, x3
+
+$$\begin{align*}     \text{minimize: }   - 5 x_2 + 1/2 (x_1^2 + x_2^2 + x_3^2)\\ \text{subject to: }     -4 x_1 - 3 x_2       & >= -8 \\                         2 x_1 +   x_2       & >= 2 \\                         - 2 x_2 + x_3 & >= 0 \end{align*}$$
+
+Could you put this problem into a matrix form?
+
+---
+# Quadratic Progarmming in ROI
+```{r}
+## Simple quadratic program.
+## minimize: - 5 x_2 + 1/2 (x_1^2 + x_2^2 + x_3^2)
+## subject to: -4 x_1 - 3 x_2       >= -8
+##              2 x_1 +   x_2       >=  2
+##                    - 2 x_2 + x_3 >=  0
+
+QP <- OP( Q_objective (Q = diag(1, 3), L = c(0, -5, 0)),   # quadratic objective
+          # qudratic part: x'Qx,     linear part: Lx
+          L_constraint(L = matrix(c(-4,-3,0,2,1,0,0,-2,1), # linear constraint
+                                  ncol = 3, byrow = TRUE), # byrow is easy for reading
+                       # Linear:    Lx
+                       dir = rep(">=", 3), 
+                       rhs = c(-8,2,0)) ) # right hand side, vector b
+QP
+```
+
+
+---
+# Solve
+
+```{r}
+sol <- ROI_solve(QP, solver = "quadprog") # choose quadratic solver
+sol
+```
+
+---
+# Extract solutions
+```{r}
+sol$solution
+# sol$objval
+sol$status
+sol$message #not much information
+```
+
+---
+# Solutions
+
+```{r}
+solution(sol, type = c("primal"))
+solution(sol, type = c("dual")) # quadratic solver is not good at it.
+```
+
+
+
+
+---
+# Portfolio optimization-minimum variance
+
+To minimize the risk, we choose invest in 30 stocks and we need to decide the share for each stock.
+Decision variables: x1, x2,..., x30. sum(x, i) = 1.
+If xi is allowed to negative, it means we can borrow stock and sell it.
+
+
+```{r}
+## Portfolio optimization - minimum variance
+## -----------------------------------------
+## get monthly returns of 30 US stocks
+suppressMessages(library("ROI"))
+##   
+data( US30 )  # 180 months for 30 stocks
+r <- na.omit( US30 )
+head(US30,2)
+```
+Could you use ROI to solve this questions?
+
+---
+# Minimize variance in ROI
+```{r}
+## objective function to minimize
+obj <- Q_objective( 2*cov(r) ) # quadratic objective: x'Mx . M is variance convariance matrix: cov(r) . ## full investment constraint
+full_invest <- L_constraint( rep(1, ncol(US30)), "==", 1 ) #  linear constraint for stock shares
+#                           (1,1, ..., 1) * (x1,x2,..., x30) ==1
+## create optimization problem / long-only
+(op <- OP( objective = obj, constraints = full_invest )) 
+```
+---
+# Solution
+
+
+```{r}
+## solve the problem - only works if a QP solver is registered
+res <- ROI_solve( op )
+res
+sol <- solution( res )
+names( sol ) <- colnames( US30 )
+round( sol[ which(sol > 1/10^6) ], 3 ) # only show large share stock. Not all 30 xi.
+```
+
+---
+class: inverse, center, middle
+name: summary
+
+# Summary
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=796px></html>
+
+---
+# Summary
+
+- Today,
+  - We covered the standard forms for linear programming and quadratic programming problems.
+  - We learned how to use ROI to solve linear programming and quadratic programming problems.
+
+---
+
+class: center, middle
+
+# Thanks!
+
+Slides created via the R package [**xaringan**](https://github.com/yihui/xaringan).
+
+The chakra comes from [remark.js](https://remarkjs.com), [**knitr**](http://yihui.name/knitr), and [R Markdown](https://rmarkdown.rstudio.com).
